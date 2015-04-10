@@ -45,16 +45,12 @@ class CountingGrid(object):
     '''
     #Add circular pads to the array, because the grid wraps around itself
     #to remove boundary effects 
-    padded_pi=np.lib.pad(self.pi, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')
-    #The following code computes histograms as averages of distributions pi 
-    #in a sliding window across the grid
-    interm_h=np.cumsum(padded_pi,1)
-    interm_h=np.transpose(interm_h,(0,2,1)) 
-    interm_h=np.cumsum(interm_h,1)
-    interm_h=np.transpose(interm_h,(0,2,1))  
-    interm_h=np.lib.pad(interm_h,((0,0),(1,0),(1,0)),'constant',constant_values=(0,0))        
-    self.h=self.averaging_procedure(interm_h,True)
-
+    padded_pi=np.lib.pad(self.pi, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')   
+    for index_horizontal in range(0,self.pi.shape[1]):
+        for index_vertical in range(0,self.pi.shape[2]):
+            for feature_index in range(0,len(self.pi[0])):
+                window_array = padded_pi[feature_index,index_horizontal:index_horizontal+self.window_size[0],index_vertical:index_vertical+self.window_size[1]]                       
+                self.h[feature_index,index_horizontal,index_vertical]=sum(window_array)/np.prod(self.window_size)
     
   def averaging_procedure(self,intermediate,normalize):
     h1=intermediate[:,self.window_size[0]:,self.window_size[1]:]   
