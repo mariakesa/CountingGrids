@@ -2,13 +2,7 @@ import numpy as np
 from scipy.misc import logsumexp
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-
-'''
-This is an implementation of the CountingGrid model. Right now it has a bug that
-I am working to find and fix. So don't use it yet!
-Reference: N.Jojic and A.Perina. "Multidimensional counting grids: Inferring word order from disordered bags of words."
-In Conference on Uncertainty in Artificial Intelligence, UAI 2011
-'''
+from scipy import io 
 
 class CountingGrid(object):
   def __init__(self, size, window_size, nr_of_features):
@@ -27,8 +21,13 @@ class CountingGrid(object):
     #corresponds to features, e.g. it is Z. The second and third
     #dimension correspond to the size of the grid in x and y directions.
     rand_init_pi = 1 + np.random.rand(self.nr_of_features,self.size[0],self.size[1])        
-    self.pi = rand_init_pi/sum(rand_init_pi,0)   
+    self.pi = rand_init_pi/sum(rand_init_pi,0)
+    #Test pi    
+    #self.pi = np.array([[[0.494, 0.524],[0.479,0.418]],[[0.506, 0.476],[0.521, 0.582]]])    
+    print self.pi.shape    
+    self.h = np.zeros((nr_of_features,self.size[0],self.size[1]))    
     self.compute_histograms()
+    
     
   def normalize_data(self,X):
     X=X.transpose()
@@ -48,21 +47,9 @@ class CountingGrid(object):
     padded_pi=np.lib.pad(self.pi, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')   
     for index_horizontal in range(0,self.pi.shape[1]):
         for index_vertical in range(0,self.pi.shape[2]):
-            for feature_index in range(0,len(self.pi[0])):
+            for feature_index in range(0,self.pi.shape[0]):
                 window_array = padded_pi[feature_index,index_horizontal:index_horizontal+self.window_size[0],index_vertical:index_vertical+self.window_size[1]]                       
                 self.h[feature_index,index_horizontal,index_vertical]=sum(window_array)/np.prod(self.window_size)
-    
-  def averaging_procedure(self,intermediate,normalize):
-    h1=intermediate[:,self.window_size[0]:,self.window_size[1]:]   
-    h2=intermediate[:,0:intermediate.shape[1]-self.window_size[0],self.window_size[1]:]      
-    h3=intermediate[:,self.window_size[0]:,:intermediate.shape[2]-self.window_size[1]]    
-    h4=intermediate[:,0:intermediate.shape[1]-self.window_size[0],0:intermediate.shape[2]-self.window_size[1]]       
-    h= h1-h2-h3+h4     
-    if normalize:
-        h= h[:,0:-1,0:-1]     
-        normalizer=np.sum(h,0)      
-        h=np.divide(h.astype(float),normalizer)
-    return h
     
   def update_pi(self,X):  
     '''
@@ -71,44 +58,34 @@ class CountingGrid(object):
     data on the grid log_q and the histograms on each
     grid point.
     '''
-    alpha = 1e-10
-    #Compute the term corresponding to multiplication and summation of counts and
-    #the mapping of samples on the grid
-    padded_q = np.lib.pad(np.exp(self.log_q), ((0,0),(self.window_size[0],0),(self.window_size[1],0)),'wrap') 
-    nr_of_samples=self.log_q.shape[0]
-    padded_q = np.reshape(padded_q,(nr_of_samples,np.prod(self.size+self.window_size)),'F')
-    padded_q=np.dot(padded_q.transpose(),X)
-    padded_q=np.reshape(padded_q.transpose(),(self.nr_of_features,self.size[0]+self.window_size[0],self.size[1]+self.window_size[1]),'F')       
-    #Okay, up to here
-    #Add small number to h for numerical reasons
-    h = self.h+self.window_size[0]*self.window_size[1]*alpha
-    padded_h = np.lib.pad(h,((0,0),(self.window_size[0],0),(self.window_size[1],0)),'wrap')           
-    #okay upto here
-    composite_q_h=np.divide(padded_q,padded_h)          
-    #Okay up to here
-    composite_q_h=np.transpose(np.cumsum(np.transpose(np.cumsum(composite_q_h,1),(0,2,1)),1),(0,2,1))
-    #Okay up to here 
-    composite_q_h=self.averaging_procedure(composite_q_h,False)   
-    #Okay up to here    
-    #Remove negative values    
-    replacement_indices = np.where(composite_q_h< 0)    
-    composite_q_h[replacement_indices]=0 
-    #okay up to here
-    pseudocounts= np.mean(np.sum(X,0).astype('float')/np.prod(self.size))/2.5
-    #Okay up to here    
-    un_pi=pseudocounts+np.multiply(composite_q_h,self.pi+alpha)    
-    mask = (sum(un_pi,0)!=0).astype(float)
-    interm_pi = np.divide(un_pi,sum(un_pi,0))
-    interm_pi = np.multiply(interm_pi,mask)
-    correction= np.multiply((float(1)/self.nr_of_features)*np.ones((self.nr_of_features,self.size[0],self.size[1])),np.logical_not(mask).astype('float'))
-    self.pi=interm_pi+correction
-  
+    padded_q=np.lib.pad(self.q, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')
+    padded_h=np.lib.pad(self.h, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')
+    print padded_q, padded_h    
+    for feature_index in range(0,self.pi.shape[0]): 
+      print feature_index
+      for index_horizontal in range(0,self.pi.shape[1]):
+        print index_horizontal 
+        for index_vertical in range(0,self.pi.shape[2]):
+          print index_vertical  
+          sample_windows=[]
+          for sample_index in range(0,self.q.shape[0]):
+            window_array = np.divide(padded_q[sample_index,index_horizontal:index_horizontal+self.window_size[0],index_vertical:index_vertical+self.window_size[1]],\
+                                     padded_h[feature_index,index_horizontal:index_horizontal+self.window_size[0],index_vertical:index_vertical+self.window_size[1]])
+            #print 'ZUM', sum(window_array)                         
+            sample_windows.append(X[sample_index,feature_index]*sum(window_array))
+          print sample_windows  
+          self.pi[feature_index,index_horizontal,index_vertical]=self.pi[feature_index,index_horizontal,index_vertical]*sum(sample_windows)
+    #Normalization
+    normalizer=np.sum(self.pi,0)
+    self.pi=np.divide(self.pi,normalizer)
+    print self.pi
+    
   def update_h(self):
     self.compute_histograms()
   
   
   #E-step    
-   def e_step(self,X):
+  def e_step(self,X):
     '''
     q is a 3D array with shape q.shape=(z_dimension=
     nr_of_samples,x and y=grid_size). 
@@ -130,8 +107,7 @@ class CountingGrid(object):
     self.q[self.q<min_numeric_probability]=min_numeric_probability   
     for t in range(0,nr_of_samples):
         normalizer=np.sum(self.q[t,:,:])              
-        self.q[t,:,:]= self.q[t,:,:]/normalizer 
-    
+        self.q[t,:,:]= self.q[t,:,:]/normalizer              
     
   #M-step
   def m_step(self,X):
@@ -148,12 +124,12 @@ class CountingGrid(object):
 
     X= [nr_of_samples, nr_of_features]    
     '''
-    X=self.normalize_data(X)
+    #X=self.normalize_data(X)
     for i in range(0,max_iteration):
-      self.e_step(X)     
+      self.e_step(X)
       self.m_step(X)
     
-    return self.pi, self.log_q
+    return self.pi, self.q
     
   def cg_plot(self,labels):
     '''Currently supports 5 different symbols,
@@ -175,9 +151,8 @@ class CountingGrid(object):
         if i==4:
             marker='+'
         for t in range(0,len(ids)):
-            temp = self.log_q[ids[t],:,:]
+            temp = self.q[ids[t],:,:]
             x,y = np.unravel_index(temp.argmax(), temp.shape)
             noise = 0.2*np.random.rand(1)
             plt.scatter(x+noise,y+noise, marker=marker,s=60,color=cm.rainbow(i*100))
-    plt.show()       
-
+    plt.show()   
