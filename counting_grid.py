@@ -108,11 +108,11 @@ class CountingGrid(object):
   
   
   #E-step    
-  def e_step(self,X):
+   def e_step(self,X):
     '''
-    log_q is a 3D array with shape q.shape=(z_dimension=
+    q is a 3D array with shape q.shape=(z_dimension=
     nr_of_samples,x and y=grid_size). 
-    It stores the log probabilities of a sample mapping to a 
+    It stores the probabilities of a sample mapping to a 
     window in location k=[i1,i2]
     
     h is a 3D array with shape h.shape(z_dimension=
@@ -124,20 +124,13 @@ class CountingGrid(object):
     #Determine a minimal considered probability, for numerical purposes
     min_numeric_probability = float(1)/(10*self.size[0]*self.size[1])
     #Initialize q
-    log_q_size=(nr_of_samples,self.size[0],self.size[1])
-    self.log_q = np.zeros(log_q_size)
-    interm_q = np.reshape(np.log(self.h),(self.nr_of_features,self.size[0]*self.size[1]),'F') 
-    interm_q = np.dot(interm_q.transpose(),X.transpose())        
-    #Replace values that fall below a threshold for numerical stability
-    numerical_manipulation=np.subtract(interm_q-np.amax(interm_q,0),logsumexp(interm_q-np.amax(interm_q,0),0)) 
-    numerical_manipulation = np.reshape(numerical_manipulation.transpose(),(nr_of_samples,self.size[0],self.size[1]),'F')
-    numerical_manipulation = np.exp(numerical_manipulation)        
-    replacement_indices = np.where(numerical_manipulation< min_numeric_probability)  
-    numerical_manipulation[replacement_indices]=min_numeric_probability
-    #Normalize the probability distributions    
+    q_size=(nr_of_samples,self.size[0],self.size[1])
+    self.q = np.zeros(q_size)
+    self.q = np.exp(np.tensordot(X,log(self.h),axes=(1,0)))    
+    self.q[self.q<min_numeric_probability]=min_numeric_probability   
     for t in range(0,nr_of_samples):
-        normalizer=np.sum(numerical_manipulation[t,:,:])              
-        self.log_q[t,:,:]= np.log(numerical_manipulation[t,:,:]/normalizer)              
+        normalizer=np.sum(self.q[t,:,:])              
+        self.q[t,:,:]= self.q[t,:,:]/normalizer 
     
     
   #M-step
