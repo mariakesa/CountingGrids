@@ -1,7 +1,6 @@
 from scipy import io 
 import numpy as np
-import counting_grid
-
+from counting_grid import CountingGrid
 
 '''
 This is an example of using the CountingGrid

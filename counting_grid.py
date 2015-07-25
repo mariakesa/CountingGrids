@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from scipy import io 
 
+'''The project is unfinished.'''
+
 class CountingGrid(object):
   def __init__(self, size, window_size, nr_of_features):
     '''
@@ -49,7 +51,7 @@ class CountingGrid(object):
         for index_vertical in range(0,self.pi.shape[2]):
             for feature_index in range(0,self.pi.shape[0]):
                 window_array = padded_pi[feature_index,index_horizontal:index_horizontal+self.window_size[0],index_vertical:index_vertical+self.window_size[1]]                       
-                self.h[feature_index,index_horizontal,index_vertical]=sum(window_array)/np.prod(self.window_size)
+                self.h[feature_index,index_horizontal,index_vertical]=sum(sum(window_array))/np.prod(self.window_size)
     
   def update_pi(self,X):  
     '''
@@ -59,26 +61,24 @@ class CountingGrid(object):
     grid point.
     '''
     padded_q=np.lib.pad(self.q, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')
-    padded_h=np.lib.pad(self.h, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')
-    print padded_q, padded_h    
-    for feature_index in range(0,self.pi.shape[0]): 
-      print feature_index
-      for index_horizontal in range(0,self.pi.shape[1]):
-        print index_horizontal 
-        for index_vertical in range(0,self.pi.shape[2]):
-          print index_vertical  
-          sample_windows=[]
-          for sample_index in range(0,self.q.shape[0]):
-            window_array = np.divide(padded_q[sample_index,index_horizontal:index_horizontal+self.window_size[0],index_vertical:index_vertical+self.window_size[1]],\
-                                     padded_h[feature_index,index_horizontal:index_horizontal+self.window_size[0],index_vertical:index_vertical+self.window_size[1]])
-            #print 'ZUM', sum(window_array)                         
-            sample_windows.append(X[sample_index,feature_index]*sum(window_array))
-          print sample_windows  
-          self.pi[feature_index,index_horizontal,index_vertical]=self.pi[feature_index,index_horizontal,index_vertical]*sum(sample_windows)
+    padded_h=np.lib.pad(self.h, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')    
+    print 'Zu',padded_q.shape, padded_h.shape 
+    q_h=np.divide(padded_q[0,:,:],padded_h[0,:,:])
+    print 'viu',q_h
+    cumulative=np.cumsum(q_h,1)
+    print 'ziu', cumulative
+    #cumulative=np.cumsum(cumulative,0)
+    #print 'Cum',cumulative
+    for vertical_index in range(0,self.size[0]):
+        for horizontal_index in range(0,self.size[1]):
+            if horizontal_index>0:
+                window_sum = sum(cumulative[vertical_index:vertical_index+self.window_size[0],horizontal_index+self.window_size[1]-1]-cumulative[vertical_index:vertical_index+self.window_size[0],horizontal_index-1])
+            else:
+                window_sum = sum(cumulative[vertical_index:vertical_index+self.window_size[0],horizontal_index+self.window_size[1]-1])
+            print 'W',vertical_index,horizontal_index,window_sum
     #Normalization
     normalizer=np.sum(self.pi,0)
     self.pi=np.divide(self.pi,normalizer)
-    print self.pi
     
   def update_h(self):
     self.compute_histograms()
@@ -103,7 +103,7 @@ class CountingGrid(object):
     #Initialize q
     q_size=(nr_of_samples,self.size[0],self.size[1])
     self.q = np.zeros(q_size)
-    self.q = np.exp(np.tensordot(X,log(self.h),axes=(1,0)))    
+    self.q = np.exp(np.tensordot(X,np.log(self.h),axes=(1,0)))    
     self.q[self.q<min_numeric_probability]=min_numeric_probability   
     for t in range(0,nr_of_samples):
         normalizer=np.sum(self.q[t,:,:])              
@@ -156,3 +156,9 @@ class CountingGrid(object):
             noise = 0.2*np.random.rand(1)
             plt.scatter(x+noise,y+noise, marker=marker,s=60,color=cm.rainbow(i*100))
     plt.show()   
+    
+X=np.array([[1,2],[3,4],[5,6]])
+cg_obj=CountingGrid(np.array([3,3]),np.array([2,2]),2)
+pi, log_q = cg_obj.fit(X,1)
+
+
