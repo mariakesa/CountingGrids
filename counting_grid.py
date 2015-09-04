@@ -42,7 +42,6 @@ class CountingGrid(object):
     cumsum2  = grid[:grid.shape[0]-self.window_size[0]+1,self.window_size[1]-1:]
     cumsum3 = grid[self.window_size[0]-1:,:grid.shape[1]-self.window_size[1]+1]    
     cumsum4 = grid[:grid.shape[0]-self.window_size[0]+1,:grid.shape[1]-self.window_size[1]+1]    
-    #print cumsum1.shape, cumsum2.shape,cumsum3.shape    
     cumsum =  cumsum1+cumsum2+cumsum3+cumsum4
     cumsum = cumsum[:cumsum.shape[1]-1,:cumsum.shape[1]-1]
     return cumsum
@@ -73,16 +72,16 @@ class CountingGrid(object):
     '''
     padded_q=np.lib.pad(self.q, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')
     padded_h=np.lib.pad(self.h, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')   
-    new_pi=zeros([self.nr_of_features,self.size[0],self.size[1]])     
+    new_pi=np.zeros([self.nr_of_features,self.size[0],self.size[1]])     
     for z in range(0,self.nr_of_features):
-        for i1 in range(0, self.size[0]):
-            for i2 in range(0,self.size[1]):
-                t_storage=[]
-                for t in range(0,X.shape[0]):
-                  interm= X[t,z]*self.compute_sum_in_a_window(np.divide(padded_q[t,:,:],padded_h[z,:,:]))[i1,i2]
-                  t_storage.append(t)
-                new_pi[z,i1,i2]=self.pi[z,i1,i2]*sum(t_storage)
-    self.pi=new_pi
+        sample_array=np.zeros(self.size[0],self.size[1])
+        for t in range(0,X.shape[0]):
+            interm= X[t,z]*self.compute_sum_in_a_window(np.divide(padded_q[t,:,:],padded_h[z,:,:]))
+            sample_array=sample_array+interm
+            #interm=sum(interm,0)
+            #print interm
+        self.pi[z,:,:]=np.multiply(sample_array,self.pi[z,:,:])
+
     normalizer=np.sum(self.pi,0)
     self.pi=np.divide(self.pi,normalizer)
     
@@ -109,7 +108,7 @@ class CountingGrid(object):
     #Initialize q
     q_size=(nr_of_samples,self.size[0],self.size[1])
     self.q = np.zeros(q_size)
-    self.q = np.exp(np.tensordot(X,log(self.h),axes=(1,0)))    
+    self.q = np.exp(np.tensordot(X,np.log(self.h),axes=(1,0)))    
     self.q[self.q<min_numeric_probability]=min_numeric_probability   
     for t in range(0,nr_of_samples):
         normalizer=np.sum(self.q[t,:,:])              

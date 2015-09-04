@@ -41,5 +41,5 @@ for j in range(0,len(Y_labels)):
 
 #Usage
 cg_obj=CountingGrid(np.array([15,15]),np.array([3,3]),500)
-pi, log_q = cg_obj.fit(X,100)
+pi, log_q = cg_obj.fit(X,25)
 cg_obj.cg_plot(Y)
