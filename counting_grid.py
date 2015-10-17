@@ -100,14 +100,7 @@ class CountingGrid(object):
     h describes the histograms (spanning along the first axis) from 
     which samples are drawn, in each location on the grid k=[i1,i2]
     '''
-    #self.q = np.tensordot(X,np.log(self.h),axes=(1,0))  
-    nr_of_samples = X.shape[0]    
-    q_size=(nr_of_samples,self.size[0],self.size[1])
-    self.q = np.zeros(q_size)
-    for index in range(0,self.size[0]):
-        for index2 in range(0,self.size[1]):
-            for t in range(0,X.shape[0]):
-                self.q[t,index,index2]=sum(X[t,:]*self.h[:,index,index2])
+    self.q = np.tensordot(X,np.log(self.h),axes=(1,0))  
     #print 'the h',self.h[0,0,0]
     #print 'the q', self.q[0,0,0]
     #Normalization in the log-domain with an exp-normalization trick
