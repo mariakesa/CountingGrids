@@ -102,8 +102,10 @@ class CountingGrid(object):
     which samples are drawn, in each location on the grid k=[i1,i2]
     '''
     self.q = np.tensordot(X,np.log(self.h),axes=(1,0))  
+    #Normalization in the log-domain with an exp-normalization trick
+    #See http://timvieira.github.io/blog/post/2014/02/11/exp-normalize-trick/    
     for index in range(0,X.shape[0]):
-        self.q[index,:,:] = (self.q[index,:,:]-np.amax(np.amax(self.q,1),1)[index])-logsumexp(self.q[index,:,:]-np.amax(np.amax(self.q,1),1)[index])
+        self.q[index,:,:] = (self.q[index,:,:]-np.amax(self.q[index,:,:]))-logsumexp(self.q[index,:,:]-np.amax(self.q[index,:,:])) 
         self.q[index,:,:] = np.exp(self.q[index,:,:])
         #print 'sum',np.sum(self.q[index,:,:])
     min_numeric_probability = float(1)/(10*self.size[0]*self.size[1])    
