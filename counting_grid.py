@@ -78,12 +78,11 @@ class CountingGrid(object):
         for t in range(0,X.shape[0]):
             interm= X[t,z]*self.compute_sum_in_a_window(np.divide(padded_q[t,:,:],padded_h[z,:,:]))
             sample_array=sample_array+interm
-            #interm=sum(interm,0)
-            #print interm
-        self.pi[z,:,:]=np.multiply(sample_array,self.pi[z,:,:])
-
+        self.pi[z,:,:]=np.multiply(sample_array,self.pi[z,:,:])     
     normalizer=np.sum(self.pi,0)
+    print 'q', padded_q[0,0,0]
     self.pi=np.divide(self.pi,normalizer)
+    print 'Pi', self.pi[0,0,0]
     
   def update_h(self):
     self.compute_histograms()
@@ -102,26 +101,27 @@ class CountingGrid(object):
     h describes the histograms (spanning along the first axis) from 
     which samples are drawn, in each location on the grid k=[i1,i2]
     '''
-    nr_of_samples = X.shape[0]
-    #Determine a minimal considered probability, for numerical purposes
-    min_numeric_probability = float(1)/(10*self.size[0]*self.size[1])
-    #Initialize q
-    q_size=(nr_of_samples,self.size[0],self.size[1])
-    self.q = np.zeros(q_size)
-    self.q = np.exp(np.tensordot(X,np.log(self.h),axes=(1,0)))    
-    self.q[self.q<min_numeric_probability]=min_numeric_probability   
-    for t in range(0,nr_of_samples):
+    self.q = np.tensordot(X,np.log(self.h),axes=(1,0))  
+    for index in range(0,X.shape[0]):
+        self.q[index,:,:] = (self.q[index,:,:]-np.amax(np.amax(self.q,1),1)[index])-logsumexp(self.q[index,:,:]-np.amax(np.amax(self.q,1),1)[index])
+        self.q[index,:,:] = np.exp(self.q[index,:,:])
+        #print 'sum',np.sum(self.q[index,:,:])
+    min_numeric_probability = float(1)/(10*self.size[0]*self.size[1])    
+    self.q[self.q<min_numeric_probability]=min_numeric_probability     
+    for t in range(0,X.shape[0]):
         normalizer=np.sum(self.q[t,:,:])              
-        self.q[t,:,:]= self.q[t,:,:]/normalizer              
-    
+        self.q[t,:,:]= self.q[t,:,:]/normalizer    
+    print 'the q',self.q[0,0,0]     
+           
   #M-step
   def m_step(self,X):
     self.update_pi(X)
     self.update_h()
+    print self.h[0,0,0]
     
   def fit(self,X,max_iteration,y=None):
     '''
-    This is a function for fitting the counting
+    This is a function for fi tting the counting
     grid using variational Expectation Maximization.
     
     The data dimensionality is nr_of_samples on first axis,
@@ -129,10 +129,13 @@ class CountingGrid(object):
 
     X= [nr_of_samples, nr_of_features]    
     '''
-    #X=self.normalize_data(X)
+    X=self.normalize_data(X)
     for i in range(0,max_iteration):
+      print 'iteration', i
       self.e_step(X)
       self.m_step(X)
+      #print 'Q', self.q
+      #print 'Pi',self.pi
     
     return self.pi, self.q
     
