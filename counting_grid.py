@@ -23,30 +23,36 @@ class CountingGrid(object):
     #corresponds to features, e.g. it is Z. The second and third
     #dimension correspond to the size of the grid in x and y directions.
     rand_init_pi = 1 + np.random.rand(self.nr_of_features,self.size[0],self.size[1])        
-    self.pi = rand_init_pi/sum(rand_init_pi,0)
-    #Test pi    
-    #self.pi = np.array([[[0.494, 0.524],[0.479,0.418]],[[0.506, 0.476],[0.521, 0.582]]])    
-    print self.pi.shape    
+    self.pi = rand_init_pi/sum(rand_init_pi,0) 
+    print self.pi
+    #self.pi = np.array([[[0.494, 0.524],[0.479,0.418]],[[0.506, 0.476],[0.521, 0.582]]])          
     self.h = np.zeros((nr_of_features,self.size[0],self.size[1]))    
     self.compute_histograms()
+    print 'Beginning',self.pi[0,0,0]
     
     
   def normalize_data(self,X):
+    X=np.exp(X/100)
     X=X.transpose()
-    normalized_X =  np.prod(self.window_size)*np.divide(X.astype('float'),np.sum(X,0)) 
+    normalized_X =  100*np.prod(self.window_size)*np.divide(X.astype('float'),np.sum(X,0)) 
     normalized_X=normalized_X.transpose()       
     return normalized_X  
     
-  def compute_sum_in_a_window(self,grid):
-    cumsum1 = grid[self.window_size[0]-1:,self.window_size[1]-1:]
-    cumsum2  = grid[:grid.shape[0]-self.window_size[0]+1,self.window_size[1]-1:]
-    cumsum3 = grid[self.window_size[0]-1:,:grid.shape[1]-self.window_size[1]+1]    
-    cumsum4 = grid[:grid.shape[0]-self.window_size[0]+1,:grid.shape[1]-self.window_size[1]+1]    
-    cumsum =  cumsum1+cumsum2+cumsum3+cumsum4
-    cumsum = cumsum[:cumsum.shape[1]-1,:cumsum.shape[1]-1]
-    return cumsum
+  def compute_sums_over_windows(self, array):
+    '''
+    Function for efficiently computing sums over windows of the array for the 
+    averaged histograms.
+    '''
+    xW=self.window_size[0]
+    yW=self.window_size[1]
+    first_term=array[:,xW:,yW:]
     
-    
+    second_term=array[:,0:array.shape[1]-xW,yW:]
+    third_term=array[:,xW:,0:array.shape[1]-yW]
+    fourth_term=array[:,0:array.shape[1]-xW,0:array.shape[1]-yW]
+    sums=first_term-second_term-third_term+fourth_term
+    return sums
+  
   def compute_histograms(self):
     '''
     Histograms at each point in the grid are computed
@@ -56,12 +62,11 @@ class CountingGrid(object):
     '''
     #Add circular pads to the array, because the grid wraps around itself
     #to remove boundary effects 
-    padded_pi=np.lib.pad(self.pi, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')   
-    for index_horizontal in range(0,self.pi.shape[1]):
-        for index_vertical in range(0,self.pi.shape[2]):
-            for feature_index in range(0,self.pi.shape[0]):
-                window_array = padded_pi[feature_index,index_horizontal:index_horizontal+self.window_size[0],index_vertical:index_vertical+self.window_size[1]]                       
-                self.h[feature_index,index_horizontal,index_vertical]=sum(sum(window_array))/np.prod(self.window_size)
+    padded_pi=np.lib.pad(self.pi, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')
+    #Compute cumsums and pad them to pass on for computing window sums over pi
+    cumsums=np.lib.pad(np.cumsum(np.cumsum(padded_pi,axis=1), axis=2),((0,0),(1,0),(1,0)), mode='constant',constant_values=(0,0))    
+    unnormalized_h=self.compute_sums_over_windows(cumsums)[:,0:self.h.shape[1],0:self.h.shape[2]]
+
     
   def update_pi(self,X):  
     '''
@@ -70,18 +75,20 @@ class CountingGrid(object):
     data on the grid log_q and the histograms on each
     grid point.
     '''
-    padded_q=np.lib.pad(self.q, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')
+    #Something goes wrong here
+    padded_q=np.lib.pad(self.q, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')   
     padded_h=np.lib.pad(self.h, ((0,0),(0,self.window_size[0]),(0,self.window_size[1])),'wrap')   
     new_pi=np.zeros([self.nr_of_features,self.size[0],self.size[1]])     
     for z in range(0,self.nr_of_features):
         sample_array=np.zeros(self.size[0],self.size[1])
         for t in range(0,X.shape[0]):
             interm= X[t,z]*self.compute_sum_in_a_window(np.divide(padded_q[t,:,:],padded_h[z,:,:]))
+            j=self.compute_sum_in_a_window(np.divide(padded_q[t,:,:],padded_h[z,:,:])) 
             sample_array=sample_array+interm
-        self.pi[z,:,:]=np.multiply(sample_array,self.pi[z,:,:])     
+        self.pi[z,:,:]=np.multiply(sample_array,self.pi[z,:,:])   
     normalizer=np.sum(self.pi,0)
     self.pi=np.divide(self.pi,normalizer)
-    print 'Pi', self.pi[0,0,0]
+    
     
   def update_h(self):
     self.compute_histograms()
@@ -100,31 +107,37 @@ class CountingGrid(object):
     h describes the histograms (spanning along the first axis) from 
     which samples are drawn, in each location on the grid k=[i1,i2]
     '''
-    self.q = np.tensordot(X,np.log(self.h),axes=(1,0))  
-    #print 'the h',self.h[0,0,0]
-    #print 'the q', self.q[0,0,0]
+    nr_of_samples = X.shape[0]
+    #Alternative way to compute log_q
+    #log_q = np.tensordot(X,np.log(self.h),axes=(1,0))
+    q_size=(nr_of_samples,self.size[0],self.size[1])
+    self.q = np.zeros(q_size)    
+    #The aim of this step is to take dot products over the features in the 
+    #data array and their probabilities in the averaged histograms h_k,z.
+    #This is achieved by first reshaping the h array.           
+    log_q=np.dot(X,np.reshape(np.log(self.h),[self.nr_of_features,self.size[0]*self.size[1]]))
     #Normalization in the log-domain with an exp-normalization trick
-    #See http://timvieira.github.io/blog/post/2014/02/11/exp-normalize-trick/        
-    for index in range(0,X.shape[0]):
-        self.q[index,:,:] = (self.q[index,:,:]-np.amax(self.q[index,:,:]))-logsumexp(self.q[index,:,:]-np.amax(self.q[index,:,:])) 
-        self.q[index,:,:] = np.exp(self.q[index,:,:])
-        #print 'sum',np.sum(self.q[index,:,:])
+    #See http://timvieira.github.io/blog/post/2014/02/11/exp-normalize-trick/ 
+    scaled=log_q.T-np.amax(log_q,axis=1)
+    log_q= scaled-logsumexp(scaled,axis=0)
+    log_q=log_q.T
+    log_q=np.reshape(log_q,[nr_of_samples,self.size[0],self.size[1]])  
+    self.q=np.exp(log_q)
+    #Filter out tiny probabilities for numerical reasons
     min_numeric_probability = float(1)/(10*self.size[0]*self.size[1])    
     self.q[self.q<min_numeric_probability]=min_numeric_probability     
-    for t in range(0,X.shape[0]):
-        normalizer=np.sum(self.q[t,:,:])              
-        self.q[t,:,:]= self.q[t,:,:]/normalizer    
-    print 'the q',self.q[0,0,0]     
-           
+    #Normalize array    
+    normalizer=np.sum(np.sum(self.q,axis=1),axis=1)
+    self.q=(self.q.T/normalizer).T
+               
   #M-step
   def m_step(self,X):
     self.update_pi(X)
     self.update_h()
-    print self.h[0,0,0]
-    
+
   def fit(self,X,max_iteration,y=None):
     '''
-    This is a function for fi tting the counting
+    This is a function for fitting the counting
     grid using variational Expectation Maximization.
     
     The data dimensionality is nr_of_samples on first axis,
@@ -137,8 +150,6 @@ class CountingGrid(object):
       print 'iteration', i
       self.e_step(X)
       self.m_step(X)
-      #print 'Q', self.q
-      #print 'Pi',self.pi
     
     return self.pi, self.q
     
