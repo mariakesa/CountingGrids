@@ -25,18 +25,12 @@ class CountingGrid(object):
     #dimension correspond to the size of the grid in x and y directions.
     rand_init_pi = 1 + np.random.rand(self.nr_of_features,self.size[0],self.size[1])        
     self.pi = rand_init_pi/sum(rand_init_pi,0) 
-    print self.pi
-    #self.pi = np.array([[[0.494, 0.524],[0.479,0.418]],[[0.506, 0.476],[0.521, 0.582]]])          
     self.h = np.zeros((nr_of_features,self.size[0],self.size[1]))    
     self.compute_histograms()
-    print 'Beginning',self.pi[0,0,0]
     
     
   def normalize_data(self,X):
-    X=np.exp(X/100)
-    X=X.transpose()
-    normalized_X =  100*np.prod(self.window_size)*np.divide(X.astype('float'),np.sum(X,0)) 
-    normalized_X=normalized_X.transpose()       
+    normalized_X =  100*np.prod(self.window_size)*np.divide(X.astype('float'),np.repeat(np.sum(X,1).reshape(X.shape[0],1),X.shape[1],axis=1))   
     return normalized_X  
     
   def compute_sums_over_windows(self, array):
@@ -68,7 +62,8 @@ class CountingGrid(object):
     unnormalized_h=self.compute_sums_over_windows(cumsums)[:,0:self.h.shape[1],0:self.h.shape[2]]
     self.h=unnormalized_h
     normalizer=np.sum(self.h,0)
-    self.h=np.divide(self.h,normalizer)
+    for j in range(0,self.h.shape[0]):
+        self.h[j,:,:]=np.divide(self.h[j,:,:].astype('float'),normalizer)
     
   def update_pi(self,X):  
     '''
@@ -86,23 +81,7 @@ class CountingGrid(object):
     division=np.divide(scalar_prod_X_q,padded_h)
     #Use cumsums to prepare for computation of sums over windows
     cumsums=np.cumsum(np.cumsum(division,axis=1),axis=2)
-    combined_X_q_h=self.compute_sums_over_windows(cumsums)
-    
-    #Filter out entries which 
-    #mask= np.sum(unnormalized_pi, axis=0)!=0
-    #print mask
-    #print 'ziu',np.multiply(self.pi,mask)
-    '''
-    for z in range(0,self.nr_of_features):
-        sample_array=np.zeros(self.size[0],self.size[1])
-        for t in range(0,X.shape[0]):
-            interm= X[t,z]*self.compute_sum_in_a_window(np.divide(padded_q[t,:,:],padded_h[z,:,:]))
-            j=self.compute_sum_in_a_window(np.divide(padded_q[t,:,:],padded_h[z,:,:])) 
-            sample_array=sample_array+interm
-        self.pi[z,:,:]=np.multiply(sample_array,self.pi[z,:,:])   
-    normalizer=np.sum(self.pi,0)
-    self.pi=np.divide(self.pi,normalizer)
-    '''
+    update_pi=self.compute_sums_over_windows(cumsums)
     
     
   def update_h(self):
@@ -143,8 +122,9 @@ class CountingGrid(object):
     self.q[self.q<min_numeric_probability]=min_numeric_probability     
     #Normalize array    
     normalizer=np.sum(np.sum(self.q,axis=1),axis=1)
-    self.q=(self.q.T/normalizer).T
-               
+    for j in range(0,self.q.shape[0]):
+        self.q[j,:,:]=self.q[j,:,:].astype('float')/normalizer[j] 
+        
   #M-step
   def m_step(self,X):
     self.update_pi(X)
@@ -190,23 +170,8 @@ class CountingGrid(object):
         for t in range(0,len(ids)):
             temp = self.q[ids[t],:,:]
             x,y = np.unravel_index(temp.argmax(), temp.shape)
-            noise = 0.2*np.random.rand(1)
+            noise = 0.5*np.random.rand(1)
             plt.scatter(x+noise,y+noise, marker=marker,s=60,color=cm.rainbow(i*100))
     plt.show()   
-    
-X=np.array([[1,2],[100,200],[5000,6]])
-cg_obj=CountingGrid(np.array([3,3]),np.array([2,2]),2)
-pi, log_q = cg_obj.fit(X,1)
 
-'''
-h=np.array([[[1,2,3],[4,5,6],[7,8,9]],[[10,11,12],[13,14,15],[16,17,18]]])
-reshape=np.reshape(h,[2,9])
-print reshape
-product=np.dot(X,reshape)
-print product
-reshape2=np.reshape(product,[3,3,3])
-print reshape2
-'''
-h=np.array([[1,2,3],[4,5,6]])
-z=np.reshape(h,(3,2),order='F')
-print z
+
