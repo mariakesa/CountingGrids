@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from scipy import io 
 
-'''The project is unfinished.'''
-
 class CountingGrid(object):
   def __init__(self, size, window_size, nr_of_features):
     '''
@@ -25,11 +23,11 @@ class CountingGrid(object):
     #dimension correspond to the size of the grid in x and y directions.
     rand_init_pi = 1 + np.random.rand(self.nr_of_features,self.size[0],self.size[1])        
     self.pi = rand_init_pi/sum(rand_init_pi,0) 
-    self.h = np.zeros((nr_of_features,self.size[0],self.size[1]))    
+    self.h = np.zeros((nr_of_features,self.size[0],self.size[1])) 
     self.compute_histograms()
     
-    
   def normalize_data(self,X):
+    X=np.exp(X/100)
     normalized_X =  100*np.prod(self.window_size)*np.divide(X.astype('float'),np.repeat(np.sum(X,1).reshape(X.shape[0],1),X.shape[1],axis=1))   
     return normalized_X  
     
@@ -64,6 +62,7 @@ class CountingGrid(object):
     normalizer=np.sum(self.h,0)
     for j in range(0,self.h.shape[0]):
         self.h[j,:,:]=np.divide(self.h[j,:,:].astype('float'),normalizer)
+    #print self.h
     
   def update_pi(self,X):  
     '''
@@ -82,7 +81,10 @@ class CountingGrid(object):
     #Use cumsums to prepare for computation of sums over windows
     cumsums=np.cumsum(np.cumsum(division,axis=1),axis=2)
     update_pi=self.compute_sums_over_windows(cumsums)
-    
+    pseudocounts=np.mean(np.sum(X.T,axis=0)/np.prod(self.size))/2.5
+    self.pi=pseudocounts+np.multiply(update_pi,self.pi+self.alpha)
+    self.pi = self.pi/sum(self.pi,0)
+    assert np.sum(self.pi,axis=0).all()==1
     
   def update_h(self):
     self.compute_histograms()
@@ -108,18 +110,22 @@ class CountingGrid(object):
     self.q = np.zeros(q_size)    
     #The aim of this step is to take dot products over the features in the 
     #data array and their probabilities in the averaged histograms h_k,z.
-    #This is achieved by first reshaping the h array.           
+    #This is achieved by first reshaping the h array.      
     log_q=np.dot(X,np.reshape(np.log(self.h),[self.nr_of_features,self.size[0]*self.size[1]]))
+    #print 'q', log_q
     #Normalization in the log-domain with an exp-normalization trick
-    #See http://timvieira.github.io/blog/post/2014/02/11/exp-normalize-trick/ 
+    #See http://timvieira.github.io/blog/post/2014/02/11/exp-normalize-trick/
+    #print log_q
     scaled=log_q.T-np.amax(log_q,axis=1)
+    #print np.amax(log_q,axis=1).shape, log_q.T.shape
     log_q= scaled-logsumexp(scaled,axis=0)
     log_q=log_q.T
     log_q=np.reshape(log_q,[nr_of_samples,self.size[0],self.size[1]])  
     self.q=np.exp(log_q)
+    #print self.q
     #Filter out tiny probabilities for numerical reasons
     min_numeric_probability = float(1)/(10*self.size[0]*self.size[1])    
-    self.q[self.q<min_numeric_probability]=min_numeric_probability     
+    self.q[self.q<min_numeric_probability]=min_numeric_probability
     #Normalize array    
     normalizer=np.sum(np.sum(self.q,axis=1),axis=1)
     for j in range(0,self.q.shape[0]):

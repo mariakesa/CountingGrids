@@ -25,7 +25,7 @@ X= data['data']
 Y_labels = data['sample_names'][0]
 X= X.T
 X = filter_by_variance(X,500)
-#Compose labels matrix from file
+#Compose labels matrix from filec
 Y=np.zeros((len(Y_labels),1))
 for j in range(0,len(Y_labels)):
     if str(Y_labels[j][0])[0:3]=='AD-':
@@ -40,6 +40,6 @@ for j in range(0,len(Y_labels)):
         Y[j]=4
 
 #Usage
-cg_obj=CountingGrid(np.array([15,15]),np.array([3,3]),500)
-pi, log_q = cg_obj.fit(X,100)
+cg_obj=CountingGrid(np.array([10,10]),np.array([3,3]),500)
+pi, log_q = cg_obj.fit(X,500)
 cg_obj.cg_plot(Y)
