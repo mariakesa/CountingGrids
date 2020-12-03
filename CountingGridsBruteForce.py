@@ -20,7 +20,7 @@ class CountingGridsBruteForce():
 
 
     def smooth_grid(self):
-        self.p_grid_pad=np.pad(self.p_grid,pad_width=[(0,0),(self.window_size-1,self.window_size-1),(self.window_size-1,self.window_size-1)],mode='wrap')
+        self.p_grid_pad=np.pad(self.p_grid,pad_width=[(0,0),(0,self.window_size),(0,self.window_size)],mode='wrap')
         #Naive way to perform convolutions over the
         #window with a average filter.
         start=time.time()
@@ -58,21 +58,34 @@ class CountingGrid():
         end=time.time()
         print(end-start)
 
+    def e_step(self,X):
+        self.embedding=np.exp(X@np.log(self.smoothed_grid.reshape(self.n_features,\
+                        self.grid_size[0]*self.grid_size[1])))
+        print(X.shape)
+        print(self.embedding.shape)
+        self.embedding=self.embedding\
+                        .reshape(X.shape[0],self.grid_size[0],self.grid_size[1])
+        print(self.embedding.shape)
+    def fit(self,X):
+        self.e_step(X)
 
 
 print('BREAK')
 start_=time.time()
-cg=CountingGrid([100,100],5,5)
+cg=CountingGrid([50,50],5,5)
 end_=time.time()
 cg_bf=cg.smoothed_grid
+n_samples=100
+X=np.random.rand(n_samples,5)
+cg.fit(X)
 
-print(cg_bf)
+#print(cg_bf)
 
-print(np.array_equal(sm_bf,cg_bf))
-print(end-start)
-print(end_-start_)
+#print(np.array_equal(sm_bf,cg_bf))
+#print(end-start)
+#print(end_-start_)
 
-plt.imshow(sm_bf[0,:,:])
-plt.show()
-plt.imshow(cg_bf[0,:,:])
-plt.show()
+#plt.imshow(sm_bf[0,:,:])
+#plt.show()
+#plt.imshow(cg_bf[0,:,:])
+#plt.show()
