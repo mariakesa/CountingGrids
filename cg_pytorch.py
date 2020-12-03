@@ -37,17 +37,6 @@ class CountingGrid_GPU():
                         .reshape(X.shape[0],self.grid_size[0],self.grid_size[1])
         self.embedding=self.embedding/sum(self.embedding)
 
-    def m_step_window(self,i,n_samples):
-        emb_w_select=self.embedding[:,i[0]:i[0]+self.window_size,
-                        i[1]:i[1]+self.window_size].reshape(n_samples,-1)
-        smoothed_g_select=self.smoothed_grid[:,i[0]:i[0]+self.window_size,
-                        i[1]:i[1]+self.window_size].reshape(self.n_features,-1)
-        div=np.zeros((n_samples,self.n_features))
-        for t in range(0,n_samples):
-            for z in range(self.n_features):
-                div[t,z]=torch.sum(emb_w_select[t,:]/smoothed_g_select[z,:])
-        return torch.cuda.FloatTensor(div)
-
     def compute_div(self,n_samples):
         div=torch.cuda.FloatTensor(np.zeros((n_samples,self.n_features,self.grid_size[0],self.grid_size[1])))
         for t in range(n_samples):
@@ -82,7 +71,7 @@ class CountingGrid_GPU():
     def fit(self,X):
         start=time.time()
         X=torch.cuda.FloatTensor(X)
-        for i in range(0,30):
+        for i in range(0,25):
             print('iteration: ',i)
             self.e_step(X)
             self.m_step(X)
@@ -140,7 +129,7 @@ data = io.loadmat('lung_bhattacherjee.mat')
 X= data['data']
 Y_labels = data['sample_names'][0]
 X= X.T
-X = filter_by_variance(X,50)
+X = filter_by_variance(X,500)
 #Compose labels matrix from filec
 Y=np.zeros((len(Y_labels),1))
 for j in range(0,len(Y_labels)):
@@ -157,6 +146,6 @@ for j in range(0,len(Y_labels)):
 
 #Usage
 X=X/np.sum(X,axis=0)
-cg_obj=CountingGrid_GPU([50,50],5,50)
+cg_obj=CountingGrid_GPU([50,50],5,500)
 cg_obj.fit(X)
 cg_obj.cg_plot(Y)
