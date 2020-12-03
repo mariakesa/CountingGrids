@@ -58,6 +58,7 @@ class CountingGrid():
         end=time.time()
         print(end-start)
 
+
     def e_step(self,X):
         self.embedding=np.exp(X@np.log(self.smoothed_grid.reshape(self.n_features,\
                         self.grid_size[0]*self.grid_size[1])))
@@ -65,9 +66,28 @@ class CountingGrid():
         print(self.embedding.shape)
         self.embedding=self.embedding\
                         .reshape(X.shape[0],self.grid_size[0],self.grid_size[1])
-        print(self.embedding.shape)
+        self.embedding=self.embedding/sum(self.embedding)
+        print(self.embedding)
+
+    def m_step_window(self,i):
+        emb_w_select=self.embedding[:,i[0]:i[0]+self.window_size,
+                        i[1]:i[1]+self.window_size].reshape(100,-1)
+        smoothed_g_select=self.smoothed_grid[:,i[0]:i[0]+self.window_size,
+                        i[1]:i[1]+self.window_size].reshape(5,-1)
+        print('emb',emb_w_select.shape)
+        print(smoothed_g_select.shape)
+        div=np.zeros((100,5))
+        for t in range(0,100):
+            for z in range(5):
+                div[t,z]=np.sum(emb_w_select[t,:]/smoothed_g_select[z,:])
+        print(div)
+
+    def m_step(self,X):
+        self.m_step_window([0,0])
+
     def fit(self,X):
         self.e_step(X)
+        self.m_step(X)
 
 
 print('BREAK')
