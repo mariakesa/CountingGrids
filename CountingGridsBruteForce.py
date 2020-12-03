@@ -74,21 +74,33 @@ class CountingGrid():
                         i[1]:i[1]+self.window_size].reshape(100,-1)
         smoothed_g_select=self.smoothed_grid[:,i[0]:i[0]+self.window_size,
                         i[1]:i[1]+self.window_size].reshape(5,-1)
-        print('emb',emb_w_select.shape)
-        print(smoothed_g_select.shape)
-        div=np.zeros((100,5))
-        for t in range(0,100):
-            for z in range(5):
+        div=np.zeros((n_samples,self.n_features))
+        for t in range(0,n_samples):
+            for z in range(self.n_features):
                 div[t,z]=np.sum(emb_w_select[t,:]/smoothed_g_select[z,:])
-        print(div)
+        return div
 
     def m_step(self,X):
-        self.m_step_window([0,0])
+        self.p_grid_old=self.p_grid.copy()
+        start=time.time()
+        for i1 in range(self.grid_size[0]):
+            for i2 in range(self.grid_size[1]):
+                div=self.m_step_window([i1,i2])
+                dot=np.sum(X*div,axis=0)
+                self.p_grid[:,i1,i2]=self.p_grid_old[:,i1,i2]*dot
+        self.p_grid=self.p_grid/sum(self.p_grid,0)
+        self.smooth_grid()
+        end=time.time()
+        print('success ',end-start)
+
 
     def fit(self,X):
-        self.e_step(X)
-        self.m_step(X)
-
+        start=time.time()
+        for i in range(0,10):
+            self.e_step(X)
+            self.m_step(X)
+        end=time.time()
+        print('all loop',end-start)
 
 print('BREAK')
 start_=time.time()
